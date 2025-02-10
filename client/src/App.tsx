@@ -7,12 +7,14 @@ import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 import HomePage from "@/pages/home-page";
 import DocumentsPage from "@/pages/documents-page";
+import RequestAccessPage from "@/pages/request-access-page";
 import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
   return (
     <Switch>
       <Route path="/auth" component={AuthPage} />
+      <Route path="/request-access/:userId" component={RequestAccessPage} />
       <ProtectedRoute path="/" component={HomePage} />
       <ProtectedRoute path="/documents" component={DocumentsPage} />
       <Route component={NotFound} />

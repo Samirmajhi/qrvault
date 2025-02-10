@@ -64,10 +64,10 @@ export default function AuthPage() {
 function LoginForm() {
   const { loginMutation } = useAuth();
   const form = useForm({
-    resolver: zodResolver(insertUserSchema.pick({ email: true, pin: true })),
+    resolver: zodResolver(insertUserSchema.pick({ email: true, password: true })),
     defaultValues: {
       email: "",
-      pin: "",
+      password: "",
     },
   });
 
@@ -92,12 +92,12 @@ function LoginForm() {
 
         <FormField
           control={form.control}
-          name="pin"
+          name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>PIN</FormLabel>
+              <FormLabel>Password</FormLabel>
               <FormControl>
-                <Input type="password" maxLength={6} {...field} />
+                <Input type="password" {...field} />
               </FormControl>
             </FormItem>
           )}
@@ -123,14 +123,25 @@ function RegisterForm() {
   const form = useForm({
     resolver: zodResolver(
       insertUserSchema.extend({
+        confirmPassword: z.string(),
         confirmPin: z.string(),
-      }).refine((data) => data.pin === data.confirmPin, {
-        message: "PINs don't match",
-        path: ["confirmPin"],
+      }).refine((data) => {
+        const isPasswordMatch = data.password === data.confirmPassword;
+        const isPinMatch = data.pin === data.confirmPin;
+        if (!isPasswordMatch) {
+          return { message: "Passwords don't match", path: ["confirmPassword"] };
+        }
+        if (!isPinMatch) {
+          return { message: "PINs don't match", path: ["confirmPin"] };
+        }
+        return true;
       }),
     ),
     defaultValues: {
+      username: "",
       email: "",
+      password: "",
+      confirmPassword: "",
       pin: "",
       confirmPin: "",
     },
@@ -139,9 +150,25 @@ function RegisterForm() {
   return (
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit((data) => registerMutation.mutate(data))}
+        onSubmit={form.handleSubmit((data) => {
+          const { confirmPassword, confirmPin, ...registerData } = data;
+          registerMutation.mutate(registerData);
+        })}
         className="space-y-4 mt-4"
       >
+        <FormField
+          control={form.control}
+          name="username"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Username</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
         <FormField
           control={form.control}
           name="email"
@@ -150,6 +177,32 @@ function RegisterForm() {
               <FormLabel>Email</FormLabel>
               <FormControl>
                 <Input type="email" {...field} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Password</FormLabel>
+              <FormControl>
+                <Input type="password" {...field} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="confirmPassword"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Confirm Password</FormLabel>
+              <FormControl>
+                <Input type="password" {...field} />
               </FormControl>
             </FormItem>
           )}

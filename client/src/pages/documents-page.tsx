@@ -30,6 +30,7 @@ export default function DocumentsPage() {
   const [showQRDialog, setShowQRDialog] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [customName, setCustomName] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data: documents, isLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents"],
@@ -38,6 +39,10 @@ export default function DocumentsPage() {
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       const res = await apiRequest("POST", "/api/documents", formData);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to upload document");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -45,6 +50,15 @@ export default function DocumentsPage() {
       toast({ title: "Document uploaded successfully" });
       setSelectedFile(null);
       setCustomName("");
+      setIsUploading(false);
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Upload failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+      setIsUploading(false);
     },
   });
 
@@ -56,15 +70,33 @@ export default function DocumentsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       toast({ title: "Document deleted successfully" });
     },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Delete failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
   });
 
   const renameMutation = useMutation({
     mutationFn: async ({ id, name }: { id: number; name: string }) => {
-      await apiRequest("PATCH", `/api/documents/${id}`, { name });
+      const res = await apiRequest("PATCH", `/api/documents/${id}`, { name });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to rename document");
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       toast({ title: "Document renamed successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Rename failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
     },
   });
 
@@ -77,8 +109,9 @@ export default function DocumentsPage() {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !customName) return;
+    if (!selectedFile || !customName || isUploading) return;
 
+    setIsUploading(true);
     const formData = new FormData();
     formData.append("file", selectedFile);
     formData.append("name", customName);
@@ -97,17 +130,19 @@ export default function DocumentsPage() {
                 type="file"
                 onChange={handleFileSelect}
                 accept=".pdf,.doc,.docx,.txt"
+                disabled={isUploading}
               />
               <Input
                 placeholder="Custom document name"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
+                disabled={isUploading}
               />
               <Button
                 onClick={handleUpload}
-                disabled={!selectedFile || !customName || uploadMutation.isPending}
+                disabled={!selectedFile || !customName || isUploading}
               >
-                {uploadMutation.isPending && (
+                {isUploading && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
                 Upload Document
@@ -158,7 +193,11 @@ export default function DocumentsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => deleteMutation.mutate(doc.id)}
+                        onClick={() => {
+                          if (confirm("Are you sure you want to delete this document?")) {
+                            deleteMutation.mutate(doc.id);
+                          }
+                        }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

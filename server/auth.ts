@@ -15,13 +15,13 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPin(pin: string) {
+async function hashPassword(input: string) {
   const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(pin, salt, 64)) as Buffer;
+  const buf = (await scryptAsync(input, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePins(supplied: string, stored: string) {
+async function compareHash(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
@@ -48,11 +48,11 @@ export function setupAuth(app: Express) {
     new LocalStrategy(
       {
         usernameField: "email",
-        passwordField: "pin",
+        passwordField: "password",
       },
-      async (email, pin, done) => {
+      async (email, password, done) => {
         const user = await storage.getUserByUsername(email);
-        if (!user || !(await comparePins(pin, user.pin))) {
+        if (!user || !(await compareHash(password, user.password))) {
           return done(null, false);
         } else {
           return done(null, user);
@@ -75,7 +75,8 @@ export function setupAuth(app: Express) {
 
     const user = await storage.createUser({
       ...req.body,
-      pin: await hashPin(req.body.pin),
+      password: await hashPassword(req.body.password),
+      pin: await hashPassword(req.body.pin),
     });
 
     req.login(user, (err) => {

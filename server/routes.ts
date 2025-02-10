@@ -5,7 +5,12 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { insertDocumentSchema } from "@shared/schema";
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+});
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -18,7 +23,15 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/documents", upload.single("file"), async (req, res) => {
-    if (!req.user || !req.file) return res.sendStatus(401);
+    if (!req.user || !req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    // Check if a document with the same name exists for this user
+    const existingDocs = await storage.getDocuments(req.user.id);
+    if (existingDocs.some((doc) => doc.name === req.body.name)) {
+      return res.status(400).json({ message: "Document with this name already exists" });
+    }
 
     const document = await storage.createDocument({
       userId: req.user.id,
@@ -32,22 +45,30 @@ export function registerRoutes(app: Express): Server {
 
   app.patch("/api/documents/:id", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
-    
+
     const document = await storage.getDocument(Number(req.params.id));
     if (!document || document.userId !== req.user.id) {
       return res.sendStatus(404);
     }
 
+    // Check if new name conflicts with existing documents
+    if (req.body.name && req.body.name !== document.name) {
+      const existingDocs = await storage.getDocuments(req.user.id);
+      if (existingDocs.some((doc) => doc.name === req.body.name)) {
+        return res.status(400).json({ message: "Document with this name already exists" });
+      }
+    }
+
     const updatedDoc = await storage.updateDocument(document.id, {
       name: req.body.name,
     });
-    
+
     res.json(updatedDoc);
   });
 
   app.delete("/api/documents/:id", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
-    
+
     const document = await storage.getDocument(Number(req.params.id));
     if (!document || document.userId !== req.user.id) {
       return res.sendStatus(404);
@@ -59,7 +80,7 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/documents/:id/download", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
-    
+
     const document = await storage.getDocument(Number(req.params.id));
     if (!document || document.userId !== req.user.id) {
       return res.sendStatus(404);
@@ -96,18 +117,18 @@ export function registerRoutes(app: Express): Server {
 
   app.get("/api/access-requests", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
-    
+
     const requests = await storage.getAccessRequests(req.user.id);
     res.json(requests);
   });
 
   app.patch("/api/access-requests/:id", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
-    
+
     const request = await storage.updateAccessRequest(Number(req.params.id), {
       status: req.body.status,
     });
-    
+
     res.json(request);
   });
 

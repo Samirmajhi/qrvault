@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { insertUserSchema } from "@shared/schema";
 import { Loader2 } from "lucide-react";
 import { useLocation } from "wouter";
+import { z } from "zod";
 
 export default function AuthPage() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -32,11 +33,11 @@ export default function AuthPage() {
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="register">Register</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="login">
                 <LoginForm />
               </TabsContent>
-              
+
               <TabsContent value="register">
                 <RegisterForm />
               </TabsContent>
@@ -44,7 +45,7 @@ export default function AuthPage() {
           </CardContent>
         </Card>
       </div>
-      
+
       <div className="hidden lg:flex flex-1 bg-primary items-center justify-center p-12">
         <div className="max-w-2xl text-primary-foreground">
           <h1 className="text-4xl font-bold mb-6">
@@ -88,7 +89,7 @@ function LoginForm() {
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="pin"
@@ -153,7 +154,7 @@ function RegisterForm() {
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="pin"
@@ -166,7 +167,7 @@ function RegisterForm() {
             </FormItem>
           )}
         />
-        
+
         <FormField
           control={form.control}
           name="confirmPin"

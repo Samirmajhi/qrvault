@@ -15,13 +15,13 @@ declare global {
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
+async function hashPin(pin: string) {
   const salt = randomBytes(16).toString("hex");
-  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  const buf = (await scryptAsync(pin, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function comparePasswords(supplied: string, stored: string) {
+async function comparePins(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
@@ -45,14 +45,20 @@ export function setupAuth(app: Express) {
   app.use(passport.session());
 
   passport.use(
-    new LocalStrategy(async (username, password, done) => {
-      const user = await storage.getUserByUsername(username);
-      if (!user || !(await comparePasswords(password, user.password))) {
-        return done(null, false);
-      } else {
-        return done(null, user);
-      }
-    }),
+    new LocalStrategy(
+      {
+        usernameField: "email",
+        passwordField: "pin",
+      },
+      async (email, pin, done) => {
+        const user = await storage.getUserByUsername(email);
+        if (!user || !(await comparePins(pin, user.pin))) {
+          return done(null, false);
+        } else {
+          return done(null, user);
+        }
+      },
+    ),
   );
 
   passport.serializeUser((user, done) => done(null, user.id));
@@ -62,14 +68,14 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/register", async (req, res, next) => {
-    const existingUser = await storage.getUserByUsername(req.body.username);
+    const existingUser = await storage.getUserByUsername(req.body.email);
     if (existingUser) {
-      return res.status(400).send("Username already exists");
+      return res.status(400).send("Email already exists");
     }
 
     const user = await storage.createUser({
       ...req.body,
-      password: await hashPassword(req.body.password),
+      pin: await hashPin(req.body.pin),
     });
 
     req.login(user, (err) => {

@@ -21,7 +21,7 @@ async function hashPassword(input: string) {
   return `${buf.toString("hex")}.${salt}`;
 }
 
-async function compareHash(supplied: string, stored: string) {
+export async function compareHash(supplied: string, stored: string) {
   const [hashed, salt] = stored.split(".");
   const hashedBuf = Buffer.from(hashed, "hex");
   const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;

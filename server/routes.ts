@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
 import { storage } from "./storage";
-import { setupAuth } from "./auth";
+import { setupAuth, compareHash } from "./auth";
 import { insertDocumentSchema } from "@shared/schema";
 
 const upload = multer({
@@ -14,6 +14,37 @@ const upload = multer({
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
+
+  // Add PIN verification endpoint
+  app.post("/api/verify-pin/:userId", async (req, res) => {
+    const { pin } = req.body;
+    const userId = Number(req.params.userId);
+
+    try {
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isValid = await compareHash(pin, user.pin);
+      res.json({ isValid });
+    } catch (error) {
+      console.error("PIN verification error:", error);
+      res.status(500).json({ message: "Failed to verify PIN" });
+    }
+  });
+
+  // Add endpoint to get user's documents
+  app.get("/api/documents/:userId", async (req, res) => {
+    const userId = Number(req.params.userId);
+    try {
+      const documents = await storage.getDocuments(userId);
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching documents:", error);
+      res.status(500).json({ message: "Failed to fetch documents" });
+    }
+  });
 
   // Document routes
   app.post("/api/documents", upload.single("file"), async (req, res) => {

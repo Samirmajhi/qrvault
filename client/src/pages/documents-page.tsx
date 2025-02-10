@@ -111,11 +111,22 @@ export default function DocumentsPage() {
   const handleUpload = async () => {
     if (!selectedFile || !customName || isUploading) return;
 
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-    formData.append("name", customName);
-    uploadMutation.mutate(formData);
+    try {
+      setIsUploading(true);
+      const formData = new FormData();
+      // Important: The name 'file' must match the multer field name
+      formData.append('file', selectedFile);
+      formData.append('name', customName);
+
+      uploadMutation.mutate(formData);
+    } catch (error) {
+      setIsUploading(false);
+      toast({ 
+        title: "Upload failed", 
+        description: "Failed to prepare file for upload",
+        variant: "destructive" 
+      });
+    }
   };
 
   return (
@@ -126,12 +137,18 @@ export default function DocumentsPage() {
         <Card className="mb-8">
           <CardContent className="p-6">
             <div className="grid gap-4">
-              <Input
-                type="file"
-                onChange={handleFileSelect}
-                accept=".pdf,.doc,.docx,.txt"
-                disabled={isUploading}
-              />
+              <div>
+                <Input
+                  type="file"
+                  onChange={handleFileSelect}
+                  accept=".pdf,.doc,.docx,.txt"
+                  disabled={isUploading}
+                  className="cursor-pointer"
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  Supported formats: PDF, DOC, DOCX, TXT (Max 10MB)
+                </p>
+              </div>
               <Input
                 placeholder="Custom document name"
                 value={customName}

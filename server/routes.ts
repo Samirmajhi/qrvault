@@ -16,31 +16,52 @@ export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
   // Document routes
+  app.post("/api/documents", upload.single("file"), async (req, res) => {
+    console.log("File upload request received", {
+      user: req.user?.id,
+      file: req.file ? "present" : "missing",
+      body: req.body
+    });
+
+    if (!req.user) {
+      return res.status(401).json({ message: "Not authenticated" });
+    }
+
+    if (!req.file) {
+      console.log("No file in request");
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    if (!req.body.name) {
+      return res.status(400).json({ message: "Document name is required" });
+    }
+
+    try {
+      // Check if a document with the same name exists for this user
+      const existingDocs = await storage.getDocuments(req.user.id);
+      if (existingDocs.some((doc) => doc.name === req.body.name)) {
+        return res.status(400).json({ message: "Document with this name already exists" });
+      }
+
+      const document = await storage.createDocument({
+        userId: req.user.id,
+        name: req.body.name,
+        content: req.file.buffer.toString("base64"),
+        contentType: req.file.mimetype,
+      });
+
+      console.log("Document created successfully", { id: document.id });
+      res.status(201).json(document);
+    } catch (error) {
+      console.error("Error creating document:", error);
+      res.status(500).json({ message: "Failed to upload document" });
+    }
+  });
+
   app.get("/api/documents", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const documents = await storage.getDocuments(req.user.id);
     res.json(documents);
-  });
-
-  app.post("/api/documents", upload.single("file"), async (req, res) => {
-    if (!req.user || !req.file) {
-      return res.status(400).json({ message: "No file uploaded" });
-    }
-
-    // Check if a document with the same name exists for this user
-    const existingDocs = await storage.getDocuments(req.user.id);
-    if (existingDocs.some((doc) => doc.name === req.body.name)) {
-      return res.status(400).json({ message: "Document with this name already exists" });
-    }
-
-    const document = await storage.createDocument({
-      userId: req.user.id,
-      name: req.body.name,
-      content: req.file.buffer.toString("base64"),
-      contentType: req.file.mimetype,
-    });
-
-    res.status(201).json(document);
   });
 
   app.patch("/api/documents/:id", async (req, res) => {

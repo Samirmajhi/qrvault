@@ -4,11 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Document } from "@shared/schema";
-import { Loader2, Download } from "lucide-react";
+import { Loader2, Download, Eye, File } from "lucide-react";
 
 export default function RequestAccessPage() {
   const { userId } = useParams();
@@ -17,6 +30,8 @@ export default function RequestAccessPage() {
   const [pin, setPin] = useState("");
   const [selectedDocs, setSelectedDocs] = useState<number[]>([]);
   const [isOwner, setIsOwner] = useState(false);
+  const [viewingDoc, setViewingDoc] = useState<Document | null>(null);
+  const [showViewer, setShowViewer] = useState(false);
 
   // Fetch documents for the owner
   const { data: documents, isLoading } = useQuery<Document[]>({
@@ -95,8 +110,17 @@ export default function RequestAccessPage() {
     );
   };
 
-  const handleDownload = (docId: number) => {
-    window.open(`/api/documents/${docId}/download`);
+  const handleDownload = (docId: number, format?: string) => {
+    let url = `/api/documents/${docId}/download`;
+    if (format) {
+      url += `?format=${format}`;
+    }
+    window.open(url);
+  };
+
+  const handleView = (doc: Document) => {
+    setViewingDoc(doc);
+    setShowViewer(true);
   };
 
   if (isLoading) {
@@ -165,13 +189,26 @@ export default function RequestAccessPage() {
                   </label>
                 </div>
                 {isOwner && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDownload(doc.id)}
-                  >
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleView(doc)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Select onValueChange={(format) => handleDownload(doc.id, format)}>
+                      <SelectTrigger className="w-[130px]">
+                        <SelectValue placeholder="Download as..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pdf">PDF</SelectItem>
+                        <SelectItem value="docx">Word (DOCX)</SelectItem>
+                        <SelectItem value="png">Image (PNG)</SelectItem>
+                        <SelectItem value="original">Original Format</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
               </div>
             ))}
@@ -189,6 +226,27 @@ export default function RequestAccessPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Document Viewer Dialog */}
+      <Dialog open={showViewer} onOpenChange={setShowViewer}>
+        <DialogContent className="max-w-4xl w-full h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <File className="h-5 w-5" />
+              {viewingDoc?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {viewingDoc && (
+            <div className="flex-1 h-full overflow-auto">
+              <iframe
+                src={`/api/documents/${viewingDoc.id}/view`}
+                className="w-full h-full border-0"
+                title={viewingDoc.name}
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -27,6 +27,10 @@ export function registerRoutes(app: Express): Server {
       }
 
       const isValid = await compareHash(pin, user.pin);
+      if (isValid) {
+        // Store verified userId in session
+        req.session.verifiedUserId = userId;
+      }
       res.json({ isValid });
     } catch (error) {
       console.error("PIN verification error:", error);
@@ -136,12 +140,33 @@ export function registerRoutes(app: Express): Server {
     res.sendStatus(204);
   });
 
-  app.get("/api/documents/:id/download", async (req, res) => {
-    if (!req.user) return res.sendStatus(401);
-
+  // Add document view endpoint
+  app.get("/api/documents/:id/view", async (req, res) => {
     const document = await storage.getDocument(Number(req.params.id));
-    if (!document || document.userId !== req.user.id) {
-      return res.sendStatus(404);
+
+    // Allow access if user is authenticated OR has verified PIN
+    const hasAccess = req.user?.id === document?.userId ||
+      req.session.verifiedUserId === document?.userId;
+
+    if (!document || !hasAccess) {
+      return res.status(401).json({ message: "Unauthorized access" });
+    }
+
+    const buffer = Buffer.from(document.content, "base64");
+    res.setHeader("Content-Type", document.contentType);
+    res.send(buffer);
+  });
+
+  // Update download endpoint to support verified PIN users
+  app.get("/api/documents/:id/download", async (req, res) => {
+    const document = await storage.getDocument(Number(req.params.id));
+
+    // Allow access if user is authenticated OR has verified PIN
+    const hasAccess = req.user?.id === document?.userId ||
+      req.session.verifiedUserId === document?.userId;
+
+    if (!document || !hasAccess) {
+      return res.status(401).json({ message: "Unauthorized access" });
     }
 
     const buffer = Buffer.from(document.content, "base64");
@@ -152,6 +177,7 @@ export function registerRoutes(app: Express): Server {
     );
     res.send(buffer);
   });
+
 
   // Access request routes
   app.post("/api/access-requests", async (req, res) => {

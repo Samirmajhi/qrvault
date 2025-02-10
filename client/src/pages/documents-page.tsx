@@ -38,7 +38,13 @@ export default function DocumentsPage() {
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const res = await apiRequest("POST", "/api/documents", formData);
+      console.log('Starting upload mutation');
+      const res = await fetch('/api/documents', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.message || "Failed to upload document");
@@ -53,6 +59,7 @@ export default function DocumentsPage() {
       setIsUploading(false);
     },
     onError: (error: Error) => {
+      console.error('Upload mutation error:', error);
       toast({ 
         title: "Upload failed", 
         description: error.message,
@@ -103,6 +110,11 @@ export default function DocumentsPage() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      console.log('File selected:', {
+        name: file.name,
+        type: file.type,
+        size: file.size
+      });
       setSelectedFile(file);
       setCustomName(file.name);
     }
@@ -114,12 +126,25 @@ export default function DocumentsPage() {
     try {
       setIsUploading(true);
       const formData = new FormData();
+
+      console.log('Uploading file:', {
+        name: selectedFile.name,
+        type: selectedFile.type,
+        size: selectedFile.size
+      });
+
       // Important: The name 'file' must match the multer field name
       formData.append('file', selectedFile);
       formData.append('name', customName);
 
+      // Log the FormData contents
+      for (const pair of formData.entries()) {
+        console.log('FormData entry:', pair[0], pair[1]);
+      }
+
       uploadMutation.mutate(formData);
     } catch (error) {
+      console.error('Upload error:', error);
       setIsUploading(false);
       toast({ 
         title: "Upload failed", 

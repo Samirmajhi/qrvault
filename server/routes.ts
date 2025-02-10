@@ -19,8 +19,14 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/documents", upload.single("file"), async (req, res) => {
     console.log("File upload request received", {
       user: req.user?.id,
-      file: req.file ? "present" : "missing",
-      body: req.body
+      file: req.file ? {
+        fieldname: req.file.fieldname,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size
+      } : "missing",
+      body: req.body,
+      headers: req.headers['content-type']
     });
 
     if (!req.user) {

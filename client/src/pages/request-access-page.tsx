@@ -8,7 +8,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Document } from "@shared/schema";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
 
 export default function RequestAccessPage() {
   const { userId } = useParams();
@@ -95,6 +95,10 @@ export default function RequestAccessPage() {
     );
   };
 
+  const handleDownload = (docId: number) => {
+    window.open(`/api/documents/${docId}/download`);
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -139,25 +143,36 @@ export default function RequestAccessPage() {
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
               {isOwner 
-                ? "You have full access to these documents:"
+                ? "Your documents - You have full access:"
                 : "Select documents to request access:"}
             </p>
 
             {documents?.map((doc) => (
-              <div key={doc.id} className="flex items-center space-x-2">
-                {!isOwner && (
-                  <Checkbox
-                    id={`doc-${doc.id}`}
-                    checked={selectedDocs.includes(doc.id)}
-                    onCheckedChange={() => handleCheckboxChange(doc.id)}
-                  />
+              <div key={doc.id} className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {!isOwner && (
+                    <Checkbox
+                      id={`doc-${doc.id}`}
+                      checked={selectedDocs.includes(doc.id)}
+                      onCheckedChange={() => handleCheckboxChange(doc.id)}
+                    />
+                  )}
+                  <label
+                    htmlFor={`doc-${doc.id}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    {doc.name}
+                  </label>
+                </div>
+                {isOwner && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDownload(doc.id)}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
                 )}
-                <label
-                  htmlFor={`doc-${doc.id}`}
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  {doc.name}
-                </label>
               </div>
             ))}
           </div>

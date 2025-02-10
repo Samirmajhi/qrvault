@@ -1,111 +1,110 @@
 import { users, documents, accessRequests } from "@shared/schema";
 import type { User, InsertUser, Document, AccessRequest } from "@shared/schema";
-import createMemoryStore from "memorystore";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import connectPg from "connect-pg-simple";
 import session from "express-session";
+import { pool } from "./db";
 
-const MemoryStore = createMemoryStore(session);
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   getDocuments(userId: number): Promise<Document[]>;
   getDocument(id: number): Promise<Document | undefined>;
   createDocument(document: Omit<Document, "id">): Promise<Document>;
   updateDocument(id: number, updates: Partial<Document>): Promise<Document>;
   deleteDocument(id: number): Promise<void>;
-  
+
   getAccessRequests(userId: number): Promise<AccessRequest[]>;
   createAccessRequest(request: Omit<AccessRequest, "id">): Promise<AccessRequest>;
   updateAccessRequest(id: number, updates: Partial<AccessRequest>): Promise<AccessRequest>;
-  
+
   sessionStore: session.Store;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private documents: Map<number, Document>;
-  private accessRequests: Map<number, AccessRequest>;
-  private currentId: { [key: string]: number };
+export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
 
   constructor() {
-    this.users = new Map();
-    this.documents = new Map();
-    this.accessRequests = new Map();
-    this.currentId = { users: 1, documents: 1, accessRequests: 1 };
-    this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000,
+    this.sessionStore = new PostgresSessionStore({
+      pool,
+      createTableIfMissing: true,
     });
   }
 
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
   async getUserByUsername(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find((user) => user.email === email);
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentId.users++;
-    const user = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
   async getDocuments(userId: number): Promise<Document[]> {
-    return Array.from(this.documents.values()).filter(
-      (doc) => doc.userId === userId
-    );
+    return await db.select().from(documents).where(eq(documents.userId, userId));
   }
 
   async getDocument(id: number): Promise<Document | undefined> {
-    return this.documents.get(id);
+    const [document] = await db.select().from(documents).where(eq(documents.id, id));
+    return document;
   }
 
   async createDocument(document: Omit<Document, "id">): Promise<Document> {
-    const id = this.currentId.documents++;
-    const newDoc = { ...document, id };
-    this.documents.set(id, newDoc);
+    const [newDoc] = await db.insert(documents).values(document).returning();
     return newDoc;
   }
 
   async updateDocument(id: number, updates: Partial<Document>): Promise<Document> {
-    const document = await this.getDocument(id);
-    if (!document) throw new Error("Document not found");
-    
-    const updatedDoc = { ...document, ...updates };
-    this.documents.set(id, updatedDoc);
+    const [updatedDoc] = await db
+      .update(documents)
+      .set(updates)
+      .where(eq(documents.id, id))
+      .returning();
+
+    if (!updatedDoc) throw new Error("Document not found");
     return updatedDoc;
   }
 
   async deleteDocument(id: number): Promise<void> {
-    this.documents.delete(id);
+    await db.delete(documents).where(eq(documents.id, id));
   }
 
   async getAccessRequests(userId: number): Promise<AccessRequest[]> {
-    return Array.from(this.accessRequests.values()).filter(
-      (req) => req.userId === userId
-    );
+    return await db
+      .select()
+      .from(accessRequests)
+      .where(eq(accessRequests.userId, userId));
   }
 
   async createAccessRequest(request: Omit<AccessRequest, "id">): Promise<AccessRequest> {
-    const id = this.currentId.accessRequests++;
-    const newRequest = { ...request, id };
-    this.accessRequests.set(id, newRequest);
+    const [newRequest] = await db
+      .insert(accessRequests)
+      .values(request)
+      .returning();
     return newRequest;
   }
 
   async updateAccessRequest(id: number, updates: Partial<AccessRequest>): Promise<AccessRequest> {
-    const request = this.accessRequests.get(id);
-    if (!request) throw new Error("Access request not found");
-    
-    const updatedRequest = { ...request, ...updates };
-    this.accessRequests.set(id, updatedRequest);
+    const [updatedRequest] = await db
+      .update(accessRequests)
+      .set(updates)
+      .where(eq(accessRequests.id, id))
+      .returning();
+
+    if (!updatedRequest) throw new Error("Access request not found");
     return updatedRequest;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
